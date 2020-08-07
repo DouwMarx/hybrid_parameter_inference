@@ -44,3 +44,13 @@ class MultiDimH(H):
     def get_z(self, y):
         z = self.phi[0]*y
         return z
+
+
+class InitCond2DOFv1H(H):
+    """
+    Measurement function for 2DOF system is a simple multiplication with a constant
+    """
+
+    def get_z(self, y):
+        z = self.phi[0]*y
+        return z

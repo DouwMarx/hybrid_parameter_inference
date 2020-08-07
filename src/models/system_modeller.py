@@ -38,11 +38,10 @@ class System(object):
         plt.figure()
         for condition,zi in enumerate(z):
             plt.plot(zi, ".",label = "c" + str(condition+1))
-        plt.legend()
-        plt.show()
+        plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
 
-    def get_parameter_summary(self):
-        print("Parameter summary")
+    def get_parameter_summary(self, print_addition = ""):
+        print("Parameter summary: " + print_addition)
         print("=================")
         print("Damage state, x: ", self.g.x)
         print("Parameters for g, theta: ", self.g.theta)
@@ -68,11 +67,16 @@ class ParameterInference(ABC):
     def cost(self, parameters):
         self.build_candidate_sys(parameters)
         z = self.sys.simulate(self.measurements["c"])  # Simulate model for all operating conditions
-        cost_for_each_measurement = [np.linalg.norm(z[i] - self.measurements["z"][i]) for i in range(len(z))]
+        cost_for_each_measurement = [np.log(np.linalg.norm(z[i] - self.measurements["z"][i])) for i in range(len(z))]
         return np.sum(cost_for_each_measurement)
 
-    def run_optimisation(self, startpoint):
-        sol = opt.minimize(self.cost, startpoint)
+    def run_optimisation(self, startpoint,bounds):
+        #sol = opt.minimize(self.cost, startpoint)#, bounds=bounds)
+        #sol = opt.shgo(self.cost, bounds=bounds)
+        # sol = opt.dual_annealing(self.cost, bounds)
+        sol = opt.differential_evolution(self.cost, bounds)
+        if sol["success"] ==False:
+            print("Optimisation considered unsuccessful due to: ", sol["message"])
         return sol
 
 
