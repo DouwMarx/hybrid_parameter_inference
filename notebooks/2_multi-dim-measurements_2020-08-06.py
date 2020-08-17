@@ -46,7 +46,7 @@ z_real_d0 = sys_real_d0.simulate(c, noise = noise, plot=False)
 # Solve for the most likely model parameters given the healthy measurements (fit sys_mod to data)
 measurements_d0= {"c":c,
                 "z":z_real_d0}
-cal_obj = sys_model.Callibration(sys_mod, measurements_d0)
+cal_obj = sys_model.Calibration(sys_mod, measurements_d0)
 start_point = np.ones(2)*2
 sol = cal_obj.run_optimisation(start_point)
 # sys_mod.get_parameter_summary()

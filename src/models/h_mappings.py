@@ -54,3 +54,12 @@ class InitCond2DOFv1H(H):
     def get_z(self, y):
         z = self.phi[0]*y
         return z
+
+class NonLinQuadratic(H):
+    """
+    Measurement function for system is modification by quadratic equation
+    """
+
+    def get_z(self, y):
+        z = self.phi[0]*y**2 + self.phi[1]*y + self.phi[2]
+        return z

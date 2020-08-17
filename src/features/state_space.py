@@ -219,5 +219,4 @@ def test_1dof_system():
     plt.plot(xdd)
     plt.show()
 
-
 #test_2dof_system()

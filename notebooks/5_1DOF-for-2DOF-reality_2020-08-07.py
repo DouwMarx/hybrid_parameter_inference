@@ -16,7 +16,7 @@ x_real_d0 = np.array([100])  # Healthy condition
 x_real_d1 = np.array([50])  # Damaged condition
 
 # Define the real physics based model g for healthy and damaged states
-g_real_d1 = g_maps.InitCond2DOFv2G(theta_real, x_real_d1)  # notice v2
+g_real_d1 = g_maps.InitCond2DOFv2G(theta_real, x_real_d1)  # notice v2 (version 2 is more flexible than 1)
 g_real_d0 = g_maps.InitCond2DOFv2G(theta_real, x_real_d0)
 
 # Define the real measurement model (Independent of health state)
@@ -28,7 +28,7 @@ sys_real_d0.get_parameter_summary(print_addition="True system parameters")
 sys_real_d1 = sys_model.System(g_real_d1, h_real)
 
 # Define the operating conditions measured at
-c = [np.array([i]) for i in np.linspace(0.1, 1, 10, dtype="float32") * 150]  # c in this case if force
+c = [np.array([i]) for i in np.linspace(0.1, 1, 10, dtype="float32") * 150]  # c in this case is force
 
 # Get the measured data under healthy conditions
 noise = {"sd": 5}
@@ -50,15 +50,16 @@ sys_mod = sys_model.System(g_mod, h_mod)
 # Solve for the most likely model parameters given the healthy measurements (fit sys_mod to data)
 measurements_d0 = {"c": c,
                    "z": z_real_d0}
-cal_obj = sys_model.Callibration(sys_mod, measurements_d0)
-start_point = np.hstack((theta_mod, phi_mod))
+cal_obj = sys_model.Calibration(sys_mod, measurements_d0)
 bounds =((0.1,5),
-         (0,5))
+         (0.1,5),
+         (0, 5))
 
-sol = cal_obj.run_optimisation(start_point,bounds)
+sol = cal_obj.run_optimisation(cal_obj.cost, bounds)
 
 print("")
 sys_mod.get_parameter_summary(print_addition="learnt parameters for model from healthy data")
+sys_mod.plot_model_vs_measured(measurements_d0,plot_title_addition="healthy")
 
 # # Get measured data for unhealthy condition (same operating conditions and noise a healthy)
 z_real_d1 = sys_real_d1.simulate(c, noise=noise, plot=True)
@@ -73,10 +74,13 @@ measurements_d1 = {"c":c,
                 "z":z_real_d1}
 inf_obj = sys_model.DamageInference(sys_mod, measurements_d1)  # sys_mod is updated with most likely
                                                                # parameters since we ran the callibration above
-start_point = np.ones(1)  # Use the healthy condition as starting condition
 bounds = ((0,100),)
-x_pred = inf_obj.run_optimisation(start_point, bounds)
+
+x_pred = inf_obj.run_optimisation(inf_obj.cost, bounds)
 
 print("")
 print("Actual damaged health state: ", sys_real_d1.g.x)
 print("Inferred damaged health state: ", x_pred["x"])
+
+# Compare the measured damaged state with model fit
+sys_mod.plot_model_vs_measured(measurements_d1)

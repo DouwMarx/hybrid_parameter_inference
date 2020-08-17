@@ -36,16 +36,34 @@ class System(object):
 
     def plot_simulate(self, z):
         plt.figure()
-        for condition,zi in enumerate(z):
-            plt.plot(zi, ".",label = "c" + str(condition+1))
+        for condition, zi in enumerate(z):
+            plt.plot(zi, ".", label="c" + str(condition + 1))
         plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
 
-    def get_parameter_summary(self, print_addition = ""):
+    def plot_model_vs_measured(self, measurements,plot_title_addition = ""):
+        c = measurements["c"]
+        z = measurements["z"]
+        t = self.g.constants["t_range"]
+        plt.figure()
+        plt.title("Model fit " + plot_title_addition)
+        z_mod = self.simulate(c, False, noise=None)
+        for condition, zi in enumerate(z):
+            plt.plot(t, zi, ".", label="c" + str(condition + 1) + "measured")
+            plt.plot(t, z_mod[condition], label="c" + str(condition + 1) + "model prediction")
+        plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        plt.xlabel("Time [s]")
+        plt.ylabel("$m_1$ acceleration ($m/s^2$)")
+
+        return
+
+    def get_parameter_summary(self, print_addition=""):
+        print("")
         print("Parameter summary: " + print_addition)
         print("=================")
         print("Damage state, x: ", self.g.x)
         print("Parameters for g, theta: ", self.g.theta)
         print("Parameters for h, phi: ", self.h.phi)
+        print("")
 
 
 class ParameterInference(ABC):
@@ -60,6 +78,7 @@ class ParameterInference(ABC):
         """
         self.sys = sys_obj
         self.measurements = measurements
+        self.optimisation_complete = False
 
     def build_candidate_sys(self, parameters):
         pass
@@ -70,30 +89,79 @@ class ParameterInference(ABC):
         cost_for_each_measurement = [np.log(np.linalg.norm(z[i] - self.measurements["z"][i])) for i in range(len(z))]
         return np.sum(cost_for_each_measurement)
 
-    def run_optimisation(self, startpoint,bounds):
-        #sol = opt.minimize(self.cost, startpoint)#, bounds=bounds)
-        #sol = opt.shgo(self.cost, bounds=bounds)
+    def run_optimisation(self, cost_function, bounds):
+        # sol = opt.minimize(self.cost, startpoint)#, bounds=bounds)
+        # sol = opt.shgo(self.cost, bounds=bounds)
         # sol = opt.dual_annealing(self.cost, bounds)
-        sol = opt.differential_evolution(self.cost, bounds)
-        if sol["success"] ==False:
+        sol = opt.differential_evolution(cost_function, bounds)
+        self.optimisation_complete = True
+        if sol["success"] == False:
             print("Optimisation considered unsuccessful due to: ", sol["message"])
         return sol
 
+    def cost_g(self, theta):
+        """
+        Used to optimize the system model g separately from h
+        Expect to have h as the residual if there is no model inadequacy
+        """
+        self.sys.g.theta = theta  # create a candidate solution keeping parameters for h constant
 
-class Callibration(ParameterInference):
+        z = self.sys.simulate(self.measurements["c"])  # Simulate model for all operating conditions
+        cost_for_each_measurement = [np.log(np.linalg.norm(z[i] - self.measurements["z"][i])) for i in range(len(z))]
+        return np.sum(cost_for_each_measurement)
+
+    def cost_h(self, phi):
+        """
+        Used to optimize the measurement model h separately from g
+        Expect to have h compensate for the inadequacy of g
+        """
+        self.sys.h.phi = phi  # create a candidate solution keeping parameters for g constant
+
+        z = self.sys.simulate(self.measurements["c"])  # Simulate model for all operating conditions
+        cost_for_each_measurement = [np.log(np.linalg.norm(z[i] - self.measurements["z"][i])) for i in range(len(z))]
+        return np.sum(cost_for_each_measurement)
+
+
+class Calibration(ParameterInference):
     """
     Used to find the optimal model parameters given healthy data
     """
 
     def build_candidate_sys(self, parameters):
         """
-        Makes a candiate solution to the optimisation problem
+        Makes a candidate solution to the optimisation problem
         :param parameters: array of parameters [theta,phi]
         :return:
         """
         # Update the system with the latest candidate solution
         self.sys.g.theta = parameters[0:self.sys.g.n_parameters]
         self.sys.h.phi = parameters[self.sys.g.n_parameters:]
+
+    def run_optimisation_separately(self, theta_bounds, phi_bounds,n_iter,plot_fit=False,verbose=False):
+
+        from matplotlib.backends.backend_pdf import PdfPages
+        pp = PdfPages('multipage.pdf')
+        for i in range(n_iter): # Repeat the separate optimisations n_iter times
+            # Optimize model g
+            self.run_optimisation(self.cost_g, theta_bounds)
+
+            if verbose:
+                self.sys.get_parameter_summary()
+            if plot_fit:
+                self.sys.plot_model_vs_measured(self.measurements, plot_title_addition="g optimized, iteration " + str(i+1))
+                pp.savefig()
+
+            # Optimize model h
+            self.run_optimisation(self.cost_h, phi_bounds)
+            if verbose:
+                self.sys.get_parameter_summary()
+            if plot_fit:
+                self.sys.plot_model_vs_measured(self.measurements, plot_title_addition="h optimized, iteration " + str(i + 1))
+                pp.savefig()
+
+        pp.close()
+
+        return
 
 
 class DamageInference(ParameterInference):
@@ -110,4 +178,3 @@ class DamageInference(ParameterInference):
         """
         # Update the system with the latest candidate solution
         self.sys.g.x = x
-

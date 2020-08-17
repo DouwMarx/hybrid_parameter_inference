@@ -30,14 +30,15 @@ c = [np.array([i]) for i in np.linspace(1, 5, 3) * 200]  # c in this case if for
 
 # Get the measured data under healthy conditions
 noise = {"sd": 100}
-z_real_d0 = sys_real_d0.simulate(c, noise=noise, plot=True)
-plt.title("Measured data at healthy condition")
-plt.ylabel("Acceleration of mass 1")
+# z_real_d0 = sys_real_d0.simulate(c, noise=noise, plot=True)
+# plt.title("Measured data at healthy condition")
+# plt.ylabel("Acceleration of mass 1")
+z_real_d0 = sys_real_d0.simulate(c, noise=noise, plot=False)
 plt.show()
 
 # # Define a model that might be appropriate for the physics we expect
+theta_mod = np.array([1])
 phi_mod = np.array([1])
-theta_mod = np.array([2])
 x_mod = x_real_d0  # Assume we know the initial damage condition exactly
 
 h_mod = h_maps.InitCond2DOFv1H(phi_mod)
@@ -48,34 +49,33 @@ sys_mod = sys_model.System(g_mod, h_mod)
 measurements_d0= {"c":c,
                 "z":z_real_d0}
 cal_obj = sys_model.Calibration(sys_mod, measurements_d0)
-start_point = np.array([1,1])
 
-bounds =((0,2),
-         (0,5))
+theta_bounds =((0,2),)  # Bounds for theta
+phi_bounds =((0, 3),)  # Bounds for phi
 
-fsol = cal_obj.run_optimisation(start_point, bounds)
-sys_mod.get_parameter_summary()
-
-
-# Get measured data for unhealthy condition (same operating conditions and noise a healthy)
-z_real_d1 = sys_real_d1.simulate(c, noise=noise, plot=True)
-plt.title("Measured data at damaged condition")
-plt.ylabel("Acceleration of mass 1")
-plt.show()
+n_iter = 3
+cal_obj.run_optimisation_separately(theta_bounds, phi_bounds,n_iter,plot_fit=True, verbose=True)
 
 
-# Infer the degree of damage x from the damaged data
-measurements_d1 = {"c":c,
-                "z":z_real_d1}
-cal_obj = sys_model.DamageInference(sys_mod, measurements_d1)  # sys_mod is updated with most likely
-                                                               # parameters since we ran the callibration above
-start_point = np.ones(1) # Use the healthy condition as starting condition
-bounds =((0,100),)
-x_pred = cal_obj.run_optimisation(start_point,bounds)
-
-print("Actual health state: ", sys_real_d1.g.x)
-print("Predicted health state: ", x_pred["x"])
-
-
-# Compare the measured damaged state with model fit
-sys_mod.plot_model_vs_measured(measurements_d1)
+# # Get measured data for unhealthy condition (same operating conditions and noise a healthy)
+# z_real_d1 = sys_real_d1.simulate(c, noise=noise, plot=True)
+# plt.title("Measured data at damaged condition")
+# plt.ylabel("Acceleration of mass 1")
+# plt.show()
+#
+#
+# # Infer the degree of damage x from the damaged data
+# measurements_d1 = {"c":c,
+#                 "z":z_real_d1}
+# cal_obj = sys_model.DamageInference(sys_mod, measurements_d1)  # sys_mod is updated with most likely
+#                                                                # parameters since we ran the callibration above
+# start_point = np.ones(1) # Use the healthy condition as starting condition
+# bounds =((0,100),)
+# x_pred = cal_obj.run_optimisation(start_point,bounds)
+#
+# print("Actual health state: ", sys_real_d1.g.x)
+# print("Predicted health state: ", x_pred["x"])
+#
+#
+# # Compare the measured damaged state with model fit
+# sys_mod.plot_model_vs_measured(measurements_d1)
