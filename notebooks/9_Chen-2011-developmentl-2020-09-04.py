@@ -6,20 +6,19 @@ import src.models.system_modeller as sys_model
 import numpy as np
 
 # Define the true model parameters
-phi_real = np.array([2])  # Measurement model transfer function is multiplication by constant
+theta_real = np.array([1])  # Mass of m1
+phi_real = np.array([1,1,1])  # Measurement model transfer function is multiplication by constant
 
 # Define different states of health (Stiffness of k1)
 x_real_d0 = np.array([100])  # Healthy condition
 x_real_d1 = np.array([50])  # Damaged condition
 
 # Define the real measurement model (Independent of health state)
-h_real = h_maps.InitCond2DOFv1H(phi_real)
+h_real = h_maps.NonLinQuadratic(phi_real)
 
 # Define the real physics based model g for healthy and damaged states
-ndof_true = 2
-g_real_d1 = g_maps.InitCondnDOFv2G(ndof_true, x_real_d1)
-g_real_d0 = g_maps.InitCondnDOFv2G(ndof_true, x_real_d0)
-
+g_real_d1 = g_maps.InitCond2DOFv1G(theta_real, x_real_d1)
+g_real_d0 = g_maps.InitCond2DOFv1G(theta_real, x_real_d0)
 
 # Define the system for healthy and damaged states
 sys_real_d0 = sys_model.System(g_real_d0, h_real)
@@ -29,7 +28,7 @@ sys_real_d1 = sys_model.System(g_real_d1, h_real)
 c = [np.array([i]) for i in np.linspace(1, 5, 3) * 200]  # c in this case if force
 
 # Get the measured data under healthy conditions
-noise = {"sd": 10}
+noise = {"sd": 100}
 # z_real_d0 = sys_real_d0.simulate(c, noise=noise, plot=True)
 # plt.title("Measured data at healthy condition")
 # plt.ylabel("Acceleration of mass 1")
@@ -37,12 +36,12 @@ z_real_d0 = sys_real_d0.simulate(c, noise=noise, plot=False)
 plt.show()
 
 # # Define a model that might be appropriate for the physics we expect
+theta_mod = np.array([1])
+phi_mod = np.array([0,0,1])
 x_mod = x_real_d0  # Assume we know the initial damage condition exactly
-phi_mod = np.array([1])
 
-ndof_mod = 2
-g_mod = g_maps.InitCondnDOFv2G(ndof_mod, x_mod)
-h_mod = h_maps.InitCond2DOFv1H(phi_mod)
+g_mod = g_maps.InitCond2DOFv1G(theta_mod, x_mod)
+h_mod = h_maps.NonLinQuadratic(phi_mod)
 sys_mod = sys_model.System(g_mod, h_mod)
 
 # Solve for the most likely model parameters given the healthy measurements (fit sys_mod to data)
@@ -51,23 +50,20 @@ measurements_d0= {"c":c,
 cal_obj = sys_model.Calibration(sys_mod, measurements_d0)
 
 # # Solve Separately
-# theta_bounds =((0.1,5),)
-# phi_bounds = ((0.1,5),
-#              (0.1,5),
-#              (0.1,5))
-#
-# n_iter = 3
-# cal_obj.run_optimisation_separately(theta_bounds, phi_bounds,n_iter,plot_fit=True, verbose=True)
+theta_bounds =((0.1,5),)
+phi_bounds = ((0.1,5),
+             (0.1,5),
+             (0.1,5))
 
-# Solve all parameters at once
-bounds = [(0.1,2) for i in range(ndof_mod*3)]
+n_iter = 3
+cal_obj.run_optimisation_separately(theta_bounds, phi_bounds,n_iter,plot_fit=True, verbose=True)
+
+# # Solve all parameters at once
 # bounds =((0.1,5),
 #          (0.1,5),
 #          (0.1,5),
-#          (0.1,5),
-#          (0.1,5),
-#         (0.1,5))
-sol = cal_obj.run_optimisation(cal_obj.cost, bounds)
+#          (0.1,5))
+# sol = cal_obj.run_optimisation(cal_obj.cost, bounds)
 
 print("")
 sys_mod.get_parameter_summary(print_addition="learnt parameters for model from healthy data")

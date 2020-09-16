@@ -1,6 +1,7 @@
 import numpy as np
 from abc import ABC, abstractmethod, abstractproperty
 import src.features.state_space as sp
+import matplotlib.pyplot as plt
 
 
 class G(ABC):
@@ -121,8 +122,8 @@ class InitCond2DOFv2G(G):
     def get_y(self, c):
         M = np.array([[self.theta[0], 0],
                       [0, self.theta[1]]])
-        C = lambda t: np.array([[self.theta[2]+self.theta[3], -self.theta[3]], [-self.theta[3], self.theta[3]]])
-        K = lambda t: np.array([[self.x[0]+self.theta[4], self.theta[4]], [-self.theta[4], self.theta[4]]])
+        C = lambda t: np.array([[self.theta[2] + self.theta[3], -self.theta[3]], [-self.theta[3], self.theta[3]]])
+        K = lambda t: np.array([[self.x[0] + self.theta[4], self.theta[4]], [-self.theta[4], self.theta[4]]])
         f = lambda t: np.array([[c[0]], [0]])
 
         X0 = np.array([0, 0])
@@ -197,14 +198,12 @@ class InitCondnDOFv2G(G):
         super().__init__(theta, x)
         self.constants = {"t_range": np.linspace(0, 1.5, 100, dtype="float32")}
 
-
-
     def make_parameters(self):
         m_multiplier = 1
         c_multiplier = 10
         k_multiplier = 100
 
-        theta_dim = self.n_dof * (1 + 1 + 1) - 1  # DOF*(n_mass + n_damp + n_stiff) - 1damaged_stiff (x)
+        # theta_dim = self.n_dof * (1 + 1 + 1) - 1  # DOF*(n_mass + n_damp + n_stiff) - 1damaged_stiff (x)
         # theta = [m...,c...,k...]
         theta_m = (np.random.rand(self.n_dof) + 1) * m_multiplier
         theta_c = (np.random.rand(self.n_dof) + 1) * c_multiplier
@@ -213,27 +212,22 @@ class InitCondnDOFv2G(G):
         return np.hstack((theta_m, theta_c, theta_k))
 
     def get_y(self, c):
-
-
-        Cmat = np.diag(self.theta[1*self.n_dof:2*self.n_dof])+\
-               np.diag(np.hstack((self.theta[1*self.n_dof+1:2*self.n_dof],np.zeros(1))))-\
-               np.diag(self.theta[1*self.n_dof+1:2*self.n_dof],-1) -\
+        Cmat = np.diag(self.theta[1 * self.n_dof:2 * self.n_dof]) + \
+               np.diag(np.hstack((self.theta[1 * self.n_dof + 1:2 * self.n_dof], np.zeros(1)))) - \
+               np.diag(self.theta[1 * self.n_dof + 1:2 * self.n_dof], -1) - \
                np.diag(self.theta[1 * self.n_dof + 1:2 * self.n_dof], 1)
 
-        Kmat = np.diag(np.hstack((self.x,self.theta[2*self.n_dof:])))+\
-               np.diag(np.hstack((self.theta[2*self.n_dof:],np.zeros(1))))-\
-               np.diag(self.theta[2*self.n_dof:],-1) -\
+        Kmat = np.diag(np.hstack((self.x, self.theta[2 * self.n_dof:]))) + \
+               np.diag(np.hstack((self.theta[2 * self.n_dof:], np.zeros(1)))) - \
+               np.diag(self.theta[2 * self.n_dof:], -1) - \
                np.diag(self.theta[2 * self.n_dof:], 1)
-
 
         M = np.diag(self.theta[0:self.n_dof])
         C = lambda t: Cmat
         K = lambda t: Kmat
 
-
         fcol = np.zeros((self.n_dof, 1))
         fcol[0, 0] = c[0]  # Apply the step force to the first
-        print(fcol)
         f = lambda t: fcol
 
         # X0 = np.array([0, 0])
@@ -242,7 +236,7 @@ class InitCondnDOFv2G(G):
         lmm2dof = sp.LMM_sys(M, C, K, f)  # Define a lumped mass model
 
         # init_cond = np.hstack((X0, Xd0))  # Set initial condition to zero
-        init_cond = np.zeros(self.n_dof*2)  # Set initial condition to zero
+        init_cond = np.zeros(self.n_dof * 2)  # Set initial condition to zero
         t_range = self.constants["t_range"]
 
         de = sp.FirsOrderDESys(lmm2dof.E_Q, init_cond, t_range)
@@ -250,5 +244,66 @@ class InitCondnDOFv2G(G):
 
         return y
 
-obj = InitCondnDOFv2G(4,np.array([999]))
-obj.get_y(np.array([100]))
+
+class Chen2011(G):
+    """
+    Three degree of freedom system from Chen 2011
+    Two masses connected with springs and dampers series, ground-m1-m2 with
+
+    The response z is the accelerations at mas 1
+    """
+
+    def __init__(self, theta, x):
+        super().__init__(theta, x)
+        self.constants = {"t_range": np.linspace(0, 0.5, 10000, dtype="float32")}
+
+    def get_y(self, c):
+        m1 = 3.5
+        I1 = 0.0082
+        r1 = (2 * 55 / 2) / 1000
+        k1 = 5e8
+        c1 = 1.2e5
+
+        m2 = 4.5
+        I2 = 0.011
+        r2 = (2 * 75 / 2) / 1000
+        k2 = 5e8
+        c2 = 1.2e5
+
+        mg = I1 * I2 / (I1 * r1 ** 2 + I2 * r1 ** 2)
+        cg = 4e5
+
+        F3 = (I2 * r1 * m1 + I1 * r2 * m2) / (I1 * r2 ** 2 + I2 * r2 ** 2)
+
+        M = np.array([[m1, 0, 0],
+                      [0, m2, 0],
+                      [-mg, mg, mg]])
+
+        kg = lambda t: np.cos(2*np.pi*458.3*t)*1.3e9
+
+        C = lambda t: np.array([[c1, 0, -cg], [0, c2, cg], [0, 0, cg]])
+        K = lambda t: np.array([[k1, 0, -kg(t)], [0, k2, kg(t)], [0, 0, kg(t)]])
+        f = lambda t: np.array([[0], [0], [F3]])
+
+        X0t = np.linalg.solve(K(0),f(0))  # initial conditions that would lead to zero initial accelerations
+        X0 = X0t[:,0]
+        Xd0 = np.array([0, 0, 0.00001])
+
+        lmm2dof = sp.LMM_sys(M, C, K, f)  # Define a lumped mass model
+
+        init_cond = np.hstack((X0, Xd0))  # Set initial condition to zero
+        t_range = self.constants["t_range"]
+
+        de = sp.FirsOrderDESys(lmm2dof.E_Q, init_cond, t_range)
+        y = de.get_Xdotdot("RK45")[:, 1]  # Measure accelerations at mass 2
+
+        return y
+
+
+# obj = InitCondnDOFv2G(4,np.array([999]))
+# obj.get_y(np.array([100]))
+
+obj = Chen2011(np.array([22]), np.array([33]))
+y = obj.get_y(12)
+plt.figure()
+plt.plot(y)

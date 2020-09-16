@@ -221,6 +221,7 @@ static
 *.lmmsol
 *.h5
 *.npy
+*.pkl
 
 #MCMC runs
 *.stan_res
