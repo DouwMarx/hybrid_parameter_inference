@@ -35,25 +35,40 @@ class System(object):
         return z
 
     def plot_simulate(self, z):
-        plt.figure()
-        for condition, zi in enumerate(z):
-            plt.plot(zi, ".", label="c" + str(condition + 1))
-        plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        subplots = False
+        t = self.g.constants["t_range"][self.g.samples_before_fault:]
+        if subplots:
+            fig,axs = plt.subplots(len(z))
+            for condition, zi in enumerate(z):
+                #axs[condition].plot(zi, ".", label="c" + str(condition + 1))
+                axs[condition].legend(loc='center left', bbox_to_anchor=(1, 0.5))
 
-    def plot_model_vs_measured(self, measurements,plot_title_addition = ""):
+        if subplots == False:
+            plt.figure()
+            for condition, zi in enumerate(z):
+                #plt.plot(zi, ".", label="c" + str(condition + 1))
+                plt.scatter(t, zi, label="c" + str(condition + 1), s=1)
+                plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+                plt.xlabel("time [s]")
+                plt.ylabel("Measured acceleration")
+        return
+
+    def plot_model_vs_measured(self, measurements, plot_title_addition = ""):
         c = measurements["c"]
         z = measurements["z"]
         t = self.g.constants["t_range"]
+
+        t = t[self.g.samples_before_fault:]  # Used for Chen2011 where a section of reponse is used.
         plt.figure()
-        plt.title("Model fit " + plot_title_addition)
+        #plt.title("Model fit " + plot_title_addition)
         z_mod = self.simulate(c, False, noise=None)
+        # TODO2: plot only one measurment
         for condition, zi in enumerate(z):
-            plt.plot(t, zi, ".", label="c" + str(condition + 1) + "measured")
-            plt.plot(t, z_mod[condition], label="c" + str(condition + 1) + "model prediction")
+            plt.plot(t, zi, ".", label= str(c[condition][0]) + "Nm measurements" )
+            plt.plot(t, z_mod[condition], label=str(c[condition][0]) + "Nm model fit")
         plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
         plt.xlabel("Time [s]")
-        plt.ylabel("$m_1$ acceleration ($m/s^2$)")
-
+        plt.ylabel("Measured acceleration ($m/s^2$)")
         return
 
     def get_parameter_summary(self, print_addition=""):
@@ -89,11 +104,15 @@ class ParameterInference(ABC):
         cost_for_each_measurement = [np.log(np.linalg.norm(z[i] - self.measurements["z"][i])) for i in range(len(z))]
         return np.sum(cost_for_each_measurement)
 
-    def run_optimisation(self, cost_function, bounds):
+    def run_optimisation(self, cost_function, bounds, startpoint = np.array([1.1, 6.5e-3, 1.1e8, 0.9e7, 0.4])):
         # sol = opt.minimize(self.cost, startpoint)#, bounds=bounds)
+
+        sol = opt.minimize(self.cost,startpoint, bounds=bounds)#, bounds=bounds)
         # sol = opt.shgo(self.cost, bounds=bounds)
         # sol = opt.dual_annealing(self.cost, bounds)
-        sol = opt.differential_evolution(cost_function, bounds)
+        # sol = opt.differential_evolution(cost_function,
+        #                                  bounds,
+        #                                  disp=True)
         self.optimisation_complete = True
         if sol["success"] == False:
             print("Optimisation considered unsuccessful due to: ", sol["message"])

@@ -28,9 +28,9 @@ class FirsOrderDESys(object):
                               method=method,
                               dense_output=True,
                               t_eval=self.time_range,
-                              vectorized=True,
-                              rtol=1e-9,
-                              atol=1e-12)
+                              vectorized=True)#,
+                              #rtol=1e-9,
+                              #atol=1e-12)
         return sol.y.T
 
     def get_Xdotdot(self, method):
@@ -46,6 +46,7 @@ class FirsOrderDESys(object):
         """
         sol = self.solve(method)
         XXd = np.zeros((len(self.time_range), self.dim))
+        #for i, timestep, in enumerate(self.time_range):
         for i, timestep, in enumerate(self.time_range):
             E, Q = self.EQ_func(timestep)
             acc = np.dot(E, np.array([sol[i]]).T) + Q

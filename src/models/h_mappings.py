@@ -45,6 +45,14 @@ class MultiDimH(H):
         z = self.phi[0]*y
         return z
 
+class Constant(H):
+    """
+    Constant multiplication factor as transfer function
+    """
+
+    def get_z(self, y):
+        z = self.phi[0]*y
+        return z
 
 class InitCond2DOFv1H(H):
     """
