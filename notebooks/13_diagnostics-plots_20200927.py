@@ -11,7 +11,7 @@ def save_plot_to_directory(plot_name):
     plt.savefig(path + "\\" + plot_name + ".pdf")
     return
 
-theta = np.array([1.116, 6.405e-3, 1e8, 1e7]) # Using theta as global variable to ensure
+theta = np.array([1.116, 6.405e-3, 1e8, 1e7]) # Using theta as global
 
 # #stiffness_reduction = np.array([0.3e8])
 # stiffness_reduction = np.array([0])
@@ -113,10 +113,23 @@ def plot_healthy_fit():
     save_plot_to_directory("fit_to_healthy_data")
     return
 
+def plot_damaged_fit():
+    fname = "mod_damage_inferred.pkl"
+    with open(fname,"rb") as f:
+        damage_inferred_mod = pickle.load(f)
+
+    fname = "damaged_measurements.pkl"
+    with open(fname,"rb") as f:
+        damaged_measurements = pickle.load(f)
+
+    damage_inferred_mod.sys.plot_model_vs_measured(damaged_measurements)
+    save_plot_to_directory("fit_to_damaged_data")
+    return
 #plot_healthy_and_damged_TVMS()
 #plot_healthy_and_damaged_at_operating_condition()
 # plot_measured_data()
-plot_healthy_fit()
+# plot_healthy_fit()
+plot_damaged_fit()
 
 # applied_torque = np.array([10])
 # stiffness_reduction = np.array([1e8*0.5])

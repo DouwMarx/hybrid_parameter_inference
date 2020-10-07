@@ -18,6 +18,7 @@ phi_real = np.array([np.sin(np.deg2rad(20))])  # Measurement model transfer func
 x_real_d0 = np.array([0])  # 0 N/m mean stiffness reduction (healthy)
 x_real_d1 = np.array([0.3e8])  # 0.3e8 N/m Damaged condition
 
+
 # Define the real measurement model (Independent of health state)
 h_real = h_maps.Constant(phi_real)
 
@@ -36,14 +37,13 @@ c = [np.array([i]) for i in [5]]  # c is applied moment 10Nm-100Nm
 # Get the measured data under healthy conditions
 noise = {"sd": 1}  # Small noise
 
-z_real_d0 = sys_real_d0.simulate(c, noise=None, plot=False)  # INFO: Toggle if plot
+z_real_d0 = sys_real_d0.simulate(c, noise=None, plot=True)  # INFO: Toggle if plot
 #plt.title("Measured data at healthy condition")
 #plt.ylabel("Acceleration of ring gear")
 #plt.show()
 
-if run_calibration:
-    with open("real_d0.pkl", "wb") as fname:
-        pickle.dump(sys_real_d0, fname)
+with open("real_d0.pkl", "wb") as fname:
+    pickle.dump(sys_real_d0, fname)
 
 # Define a model that might be appropriate for the physics we expect
 # theta_real = np.array([1.116, 6.405e-3, 1e8, 1e7])  # theta = [m_ring, I_ring, k1 ,k2, c_prop]
@@ -56,9 +56,8 @@ g_mod = g_maps.Chen2011(theta_mod, x_mod)
 h_mod = h_maps.Constant(phi_mod)
 sys_mod = sys_model.System(g_mod, h_mod)
 
-if run_calibration:
-    with open("sys_mod.pkl", "wb") as fname:
-        pickle.dump(z_real_d0, fname)
+with open("sys_mod.pkl", "wb") as fname:
+    pickle.dump(sys_mod, fname)
 
 # Solve for the most likely model parameters given the healthy measurements (fit sys_mod to data)
 measurements_d0= {"c":c,
@@ -89,13 +88,12 @@ bounds =((1, 1.2),
          (8e6, 1.2e7),
          (0.2, 0.4),)
 
-if run_calibration:
-    sol = cal_obj.run_optimisation(cal_obj.cost, bounds)
+sol = cal_obj.run_optimisation(cal_obj.cost, bounds)
 
-    print("")
-    sys_mod.get_parameter_summary(print_addition="learnt parameters for model from healthy data")
-    with open("sys_calibrated.pkl", "wb") as fname:
-        pickle.dump(cal_obj, fname)
+print("")
+sys_mod.get_parameter_summary(print_addition="learnt parameters for model from healthy data")
+with open("sys_calibrated.pkl", "wb") as fname:
+    pickle.dump(cal_obj, fname)
 
     # # Compare the measured healthy state with model fit
     # try:
@@ -103,22 +101,22 @@ if run_calibration:
     # except:
     #     pass
 
-else:
-    with open("sys_calibrated.pkl", "rb") as fname:
-        cal_obj = pickle.load(fname)
+with open("sys_calibrated.pkl", "rb") as fname:
+    cal_obj = pickle.load(fname)
 
 # # Get measured data for unhealthy condition (same operating conditions and noise a healthy)
-z_real_d1 = sys_real_d1.simulate(c, noise=noise, plot=False)
+z_real_d1 = sys_real_d1.simulate(c, noise=None, plot=True)
 plt.title("Measured data at damaged condition")
 plt.ylabel("Acceleration ring gear")
 plt.show()
 
-with open("damaged_measurements.pkl", "wb") as fname:
-    pickle.dump(z_real_d1, fname)
 #
 # Infer the degree of damage x from the damaged data
 measurements_d1 = {"c":c,
                 "z":z_real_d1}
+
+with open("damaged_measurements.pkl", "wb") as fname:
+    pickle.dump(measurements_d1, fname)
 
 if run_calibration==False:
     sys_mod = cal_obj.sys # Use the calibrated healthy object
@@ -126,18 +124,20 @@ if run_calibration==False:
 cal_obj_for_damaged = sys_model.DamageInference(sys_mod, measurements_d1)  # sys_mod is updated with most likely
                                                                # parameters since we ran the callibration above
 
-bounds =((0.2e8, 0.4e8),)
-x_pred = cal_obj_for_damaged.run_optimisation(cal_obj.cost, bounds,startpoint=np.array([0.21e8]))
+damage_inference = True
+if damage_inference ==True:
+    bounds =((0.2e8, 0.4e8),)
+    x_pred = cal_obj_for_damaged.run_optimisation(cal_obj_for_damaged.cost, bounds, startpoint=np.array([0.31e8]))
 
-print("Actual health state: ", sys_real_d1.g.x)
-print("Predicted health state: ", x_pred["x"])
+    print("Actual health state: ", sys_real_d1.g.x)
+    print("Predicted health state: ", x_pred["x"])
 
 
-# Compare the measured damaged state with model fit
-try:
-    sys_mod.plot_model_vs_measured(measurements_d1)
-except:
-    pass
-with open("mod_damage_inferred.pkl", "wb") as fname:
-    pickle.dump(cal_obj, fname)
-print(t_start - time.time())
+    #Compare the measured damaged state with model fit
+    try:
+        sys_mod.plot_model_vs_measured(measurements_d1)
+    except:
+        pass
+    with open("mod_damage_inferred.pkl", "wb") as fname:
+        pickle.dump(cal_obj, fname)
+    print(time.time() - t_start )

@@ -15,7 +15,7 @@ opperating_condition = 12
 
 t = obj.constants["t_range"]
 frequency = 10 #Hz
-k = np.array([obj.tvms(t_inc,500) for t_inc in t])
+k = np.array([obj.tvms(t_inc, 500) for t_inc in t])
 plt.figure()
 plt.plot(t,k)
 

@@ -10,6 +10,9 @@ import dill
 delta_N = 10000
 
 class ParisLaw(ssm.StateSpaceModel):
+    """
+    The state space mode that defines the Paris law
+    """
     #default_parameters = {'c': 8.5e-11, 'm': 2.7, "a0": 1}
 
     def PX0(self):  # Distribution of X_0
@@ -28,7 +31,7 @@ class ParisLaw(ssm.StateSpaceModel):
     def delta_K(self, ap):
         return 50 + 50 * ap ** 2 # TODO: This is not true sifs. Could use analytical but it is calculated by FEM
 
-rerun_simulation = True # If the simulation in not rerun, an older simulation is simply loaded
+rerun_simulation = False # If the simulation in not rerun, an older simulation is simply loaded
 if rerun_simulation:
     # Generate data for the true model parameters
     true_c = 8.5e-11
@@ -83,20 +86,25 @@ class ProcessSmc2Obj(object):
     def plot_data(self):
         plt.figure()
         #plt.plot(range(len(self.data)), self.data)
-        plt.scatter(
-            range(len(self.data)), self.data)
-        plt.xlabel("Measurement interval")
-        plt.ylabel("Crack_length [mm]")
+        n_cycles = self.time_steps*delta_N
+        plt.scatter(n_cycles, self.data,c="k",marker="x")
+        #plt.scatter(range(len(self.data)), self.data,c="k",marker="x")
+        plt.xlabel("Number of cycles")
+        plt.ylabel("Crack length [mm]")
         self.save_plot_to_directory("measured_data")
         return
 
     def plot_theta_dists(self):
         plt.figure()
-        plt.title("Have to show subplots for all parameters")
-        for i in range(self.n_data_points):
-            plt.hist(self.Xhist[i].theta["m"], label=str(i), bins=20, density=True)  # Check if this should perhaps
+        plt.xlabel("Paris law m")
+        plt.ylabel("Probability density")
+        for i in [7,8,9,10]:#range(self.n_data_points):
+            print("yo")
+            #plt.hist(self.Xhist[i].theta["m"], label=str(i), bins=20, density=True)  # Check if this should perhaps
+            sb.distplot(self.Xhist[i].theta["m"],hist_kws={"density":True},label = str(i), kde=False)#
             # include weights?
-        self.save_plot_to_directory("theta_update")
+        plt.legend()
+        #self.save_plot_to_directory("theta_update")
         return
 
     def extract_state_particles_and_weights(self):
@@ -118,11 +126,14 @@ class ProcessSmc2Obj(object):
         plt.figure()
         for i in self.time_steps:
             # plt.hist(self.pf_particles[i], bins=20,weights=self.pf_weights[i], density=False, label=str(i))
-            sb.distplot(self.pf_particles[i],hist_kws={"density":True},label = str(i), kde=False) # TODO: I am not
+            sb.distplot(self.pf_particles[i],hist_kws={"density":True},label = str(i), kde=False) # "
+                                                                               #"TODO: I am not
             # using the weights.
             # Should I be
             # using them
             # kde takes long therefore set to False for now
+        plt.xlabel("Crack length")
+        plt.ylabel("Posterior probability density")
         plt.legend()
         self.save_plot_to_directory("posterior_states")
         return
@@ -130,16 +141,18 @@ class ProcessSmc2Obj(object):
     def plot_state_estimates_with_time(self):
         state_aves = np.array([np.mean(self.pf_particles[i]) for i in self.time_steps])
         state_sds= np.array([np.std(self.pf_particles[i]) for i in self.time_steps])
-
+        n_cycles = self.time_steps*delta_N
         plt.figure()
-        plt.scatter(self.time_steps,self.data, marker="x", label="Measurements")
-        plt.plot(self.time_steps, state_aves, label="Average of state estimate")
+        plt.scatter(n_cycles,self.data, marker="x", label="Measurements")
+        plt.plot(n_cycles, state_aves, label="Average of state estimate")
         factor = 1
         top = state_aves + state_sds*factor
         bot = state_aves - state_sds*factor
 
-        plt.fill_between(self.time_steps, bot, top, alpha= 0.3, label="1 standard deviation")
+        plt.fill_between(n_cycles, bot, top, alpha= 0.3, label="1 standard deviation")
         plt.legend()
+        plt.xlabel("Number of cycles")
+        plt.ylabel("state estimate")
         self.save_plot_to_directory("mean_and_sd_states_with_time")
 
         return
@@ -188,11 +201,11 @@ class ProcessSmc2Obj(object):
             rul_sds.append(np.std(rul_dist))
 
             # The the histograms of the RULs
-            plt.hist(rul_dist,label = str(t))#, density=True)
-
+            plt.hist(rul_dist,label = "Measurement " + str(t))#, density=True)
 
         plt.xlabel("Cycles to failure")
         plt.ylabel("RUL probability density")
+        plt.legend()
         self.save_plot_to_directory("rul_dists")
 
         # Plot the mean Rul vs actual
@@ -200,10 +213,10 @@ class ProcessSmc2Obj(object):
         rul_sds = np.array(rul_sds)
         plt.figure()
         n_cycles = self.time_steps*delta_N
-        plt.plot(n_cycles, rul_aves)
+        plt.plot(n_cycles, rul_aves, label = "Average of predicted RUL")
         top = rul_aves + rul_sds
         bot = rul_aves - rul_sds
-        plt.fill_between(n_cycles, bot, top,alpha=0.3)
+        plt.fill_between(n_cycles, bot, top, alpha=0.3, label = "1 standard \n deviation \n from mean")
 
         # Plot the true RUL line
         pl = ParisLaw()
@@ -216,20 +229,23 @@ class ProcessSmc2Obj(object):
 
        # TODO : use truemodel c m and a0 for RUl
         #plt.plot(n_cycles, n_cycles[-1]-n_cycles)
-        plt.plot(n_cycles, true_cycles_to_fail[-1] - true_cycles_to_fail)
+        #plt.plot(n_cycles, true_cycles_to_fail[-1] - true_cycles_to_fail)
+        plt.scatter(n_cycles, true_cycles_to_fail, label="True RUL", marker="x", c="k")
+        #plt.plot(n_cycles, true_cycles_to_fail[0]-n_cycles, label="True RUL")
 
         plt.xlabel("Number of cycles applied")
         plt.ylabel("Remaining number of cycles")
+        plt.legend()
         self.save_plot_to_directory("rul_vs_true")
         return
 
 
 proc_obj = ProcessSmc2Obj(alg_smc2)
-proc_obj.plot_data()
-proc_obj.plot_state_dists()
-proc_obj.plot_theta_dists()
+#proc_obj.plot_data()
+#proc_obj.plot_state_dists()
+#proc_obj.plot_theta_dists()
 proc_obj.plot_state_estimates_with_time()
-proc_obj.plot_RUL_dists()
+# proc_obj.plot_RUL_dists()
 
 # cyc = proc_obj.estimate_rul(3)
 # plt.figure()

@@ -104,7 +104,7 @@ class ParameterInference(ABC):
         cost_for_each_measurement = [np.log(np.linalg.norm(z[i] - self.measurements["z"][i])) for i in range(len(z))]
         return np.sum(cost_for_each_measurement)
 
-    def run_optimisation(self, cost_function, bounds, startpoint = np.array([1.1, 6.5e-3, 1.1e8, 0.9e7, 0.4])):
+    def run_optimisation(self, cost_function, bounds, startpoint = np.array([1.1, 6.5e-3, 0.9e8, 0.9e7, 0.4])):
         # sol = opt.minimize(self.cost, startpoint)#, bounds=bounds)
 
         sol = opt.minimize(self.cost,startpoint, bounds=bounds)#, bounds=bounds)
