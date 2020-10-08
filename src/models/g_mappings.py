@@ -245,7 +245,7 @@ class InitCondnDOFv2G(G):
         return y
 
 
-class Chen2011(G):
+class Chen2011_4params(G):
     """
     Three degree of freedom system from Chen 2011
     Two masses connected with springs and dampers series, ground-m1-m2 with
@@ -399,3 +399,325 @@ class Chen2011(G):
 
 # obj = InitCondnDOFv2G(4,np.array([999]))
 # obj.get_y(np.array([100]))
+
+class Chen2011_stifness_not_update(G):
+    """
+    Three degree of freedom system from Chen 2011
+    Two masses connected with springs and dampers series, ground-m1-m2 with
+    Ma and Chen 2012. Key Ma2012
+
+    The response z is the accelerations at mas 1
+    """
+
+    def __init__(self, theta, x):
+        super().__init__(theta, x)
+        self.constants = {"t_range": np.linspace(0, 0.015, 2000, dtype="float32"),
+                          "f": 179,  # When motor is driving at 1000RPM
+                          "k_sts": 2.3e8,
+                          "k_dts": 1.3e8,
+                          "smoothness_delta": 0.03,
+                          "cycles_before_fault": 1, # TODO2: This might be too short period to reach steady state
+                          "r1":0.131/2,  # Ring radius
+                          "r2":0.051/2,  # Planet radius
+                          "m2": 0.153,  # Planet mass
+                          "I2": 6.466e-5
+                          }
+
+        # Extract constants from dictionary
+        self.f = self.constants["f"]
+        self.k_sts = self.constants["k_sts"]
+        self.k_dts = self.constants["k_dts"]
+        self.delta_ts = self.k_dts - self.k_sts  # Change in stiffness
+        self.smoothness_delta = self.constants["smoothness_delta"]
+        self.cycles_before_fault = self.constants["cycles_before_fault"]
+        self.x = x  # This is the health state
+
+        #Pre-computed constants for TVMS
+        self.sq_c1= self.delta_ts*0.5
+        self.sq_c2= 2 / np.pi
+        self.sq_c3= np.pi*2*self.f
+
+        # sampling period
+        self.sampling_period = np.average(np.diff(self.constants["t_range"]))
+        self.samples_before_fault = int(self.cycles_before_fault*(1/self.f)/self.sampling_period)
+
+        # Calculate parameters for the faulty square wave
+        fault_start_time = self.cycles_before_fault / self.f
+        fault_end_time = (self.cycles_before_fault + 1) / self.f
+        self.transition_time = (1 / self.f) * (1 / 25)  # Transition for a tenth of the period
+        self.half_transition_time = self.transition_time / 2
+
+        self.first_transition_start_time = fault_start_time - self.half_transition_time
+        self.first_transition_end_time = fault_start_time + self.half_transition_time
+        self.second_transition_start_time = fault_end_time - self.half_transition_time
+        self.second_transition_end_time = fault_end_time + self.half_transition_time
+
+        self.k_at_first_transition_start = self.smooth_square(self.first_transition_start_time)
+        self.k_at_first_transition_end = self.smooth_square(self.first_transition_end_time) - self.x
+        self.k_at_second_transition_start = self.smooth_square(
+            self.second_transition_start_time) - self.x
+        self.k_at_second_transition_end = self.smooth_square(self.second_transition_end_time)
+
+        self.first_transition_gradient = (
+                                                 self.k_at_first_transition_start - self.k_at_first_transition_end) /\
+                                         self.transition_time
+        self.second_transition_gradient = (
+                                                  self.k_at_second_transition_start -
+                                                  self.k_at_second_transition_end) / self.transition_time
+
+
+        return
+
+    def smooth_square(self, t):
+        #return self.k_sts + self.delta_ts * 0.5 * ((2 / np.pi) * np.arctan(np.sin(2 * np.pi * t * self.f) /
+        #                                                                   self.smoothness_delta) + 1)
+        return self.k_sts + self.sq_c1 * ((self.sq_c2) * np.arctan(np.sin(self.sq_c3*t) /self.smoothness_delta) + 1)
+
+
+    def tvms(self, t):
+        if self.x[0]==0: # In healthy condition no alteration is required
+            #print("Healthy  loop")
+            return self.smooth_square(t)
+
+        if self.first_transition_start_time < t <= self.first_transition_end_time:
+            return self.k_at_first_transition_start - (
+                    t - self.first_transition_start_time) * self.first_transition_gradient
+        # during fault
+        if self.first_transition_end_time < t <= self.second_transition_start_time:
+            return self.smooth_square(t) - self.x
+
+        if self.second_transition_start_time < t <= self.second_transition_end_time:
+            return self.k_at_second_transition_start - (
+                    t - self.second_transition_start_time) * self.second_transition_gradient
+
+        # # ramp up after fault
+        # if fault_end_time - half_transition_time < t < fault_end_time + half_transition_time:
+        #     return self.smooth_square(fault_end_time-half_transition_time) + stiffness_decrease + (t-(
+        #             fault_end_time-half_transition_time))*stiffness_decrease/transition_time
+
+        else:
+            return self.smooth_square(t)
+
+    def update_x_related(self):
+        self.k_at_first_transition_start = self.smooth_square(self.first_transition_start_time)
+        self.k_at_first_transition_end = self.smooth_square(self.first_transition_end_time) - self.x
+        self.k_at_second_transition_start = self.smooth_square(
+            self.second_transition_start_time) - self.x
+        self.k_at_second_transition_end = self.smooth_square(self.second_transition_end_time)
+
+        self.first_transition_gradient = (
+                                                 self.k_at_first_transition_start - self.k_at_first_transition_end) / \
+                                         self.transition_time
+        self.second_transition_gradient = (
+                                                  self.k_at_second_transition_start -
+                                                  self.k_at_second_transition_end) / self.transition_time
+        return
+
+    def get_y(self, c):
+        self.update_x_related()
+        print(self.k_at_second_transition_start)
+        m1 = self.theta[0] # 1.116
+        I1 =  6.405e-3  # self.theta[1]
+        r1 = self.constants["r1"]  # (2 * 55 / 2) / 1000
+        k1 = 1e8  # self.theta[1]
+        c1 = 1.2e5 #5e3# 3e5  # 1.2e5 # self.theta[2]
+
+        m2 = self.constants["m2"]   # 0.015
+        I2 = self.constants["I2"] # 0.011
+        r2 = self.constants["r2"] # (2 * 75 / 2) / 1000
+        k2 = 1e7 #self.theta[3]
+        c2 = 1.2e5# 5e3#3e5# 1.2e5 #self.theta[2]
+
+        mg = I1 * I2 / (I1 * r2 ** 2 + I2 * r1 ** 2)
+        cg = 1e3 # 8e3#1e3 #self.theta[4]
+
+        M2 = c[0]  # Operating condition is applied torque to planet gear
+        M1 = M2*r2/r1  # Ensure force equilibrium
+
+        F3 = (I2 * r1 * M1 + I1 * r2 * M2) / (I1 * r2 ** 2 + I2 * r2 ** 2)
+
+        M = np.array([[m1, 0, 0],
+                      [0, m2, 0],
+                      [-mg, mg, mg]])
+
+        kg = lambda t: self.tvms(t)
+
+        C_arr = np.array([[c1, 0, -cg], [0, c2, cg], [0, 0, cg]])
+        C = lambda t: C_arr#Rather use proportional damping
+
+        K = lambda t: np.array([[k1, 0, -kg(t)], [0, k2, kg(t)], [0, 0, kg(t)]])
+
+        Mp_K0 = K(0) + M
+
+        #C = lambda t: Mp_K0*self.theta[4] # For making use of proportional damping
+
+        f = lambda t: -np.array([[0], [0], [F3]])
+
+        X0t = np.linalg.solve(K(0), f(0))  # initial conditions that would lead to zero initial accelerations
+        X0 = X0t[:, 0]
+        Xd0 = np.array([0, 0, 0])
+
+        lmm2dof = sp.LMM_sys(M, C, K, f)  # Define a lumped mass model
+
+        # init_cond = np.hstack((X0, Xd0))  # Set initial condition
+        init_cond = np.zeros(6)
+        t_range = self.constants["t_range"]
+
+        de = sp.FirsOrderDESys(lmm2dof.E_Q, init_cond, t_range)
+        y = de.get_Xdotdot("RK45")[:, 0]  # Measure accelerations at mass 1
+
+        y_measured_section = y[self.samples_before_fault:]
+        #y_measured_section = y
+
+        return y_measured_section
+
+
+class Chen2011(G):
+    """
+    Three degree of freedom system from Chen 2011
+    Two masses connected with springs and dampers series, ground-m1-m2 with
+    Ma and Chen 2012. Key Ma2012
+
+    The response z is the accelerations at mas 1
+    """
+
+    def __init__(self, theta, x, cycles_before_fault = 1):
+        super().__init__(theta, x)
+        self.constants = {"t_range": np.linspace(0, 0.015, 2000, dtype="float32"),
+                          "f": 179,  # When motor is driving at 1000RPM
+                          "k_sts": 2.3e8,
+                          "k_dts": 1.3e8,
+                          "smoothness_delta": 0.03,
+                          "cycles_before_fault": 1, # TODO2: This might be too short period to reach steady state
+                          "r1":0.131/2,  # Ring radius
+                          "r2":0.051/2,  # Planet radius
+                          "m2": 0.153,  # Planet mass
+                          "I2": 6.466e-5
+                          }
+
+        # Extract constants from dictionary
+        self.f = self.constants["f"]
+        self.k_sts = self.constants["k_sts"]
+        self.k_dts = self.constants["k_dts"]
+        self.delta_ts = self.k_dts - self.k_sts  # Change in stiffness
+        self.smoothness_delta = self.constants["smoothness_delta"]
+        self.cycles_before_fault = cycles_before_fault # self.constants["cycles_before_fault"]
+        self.x = x  # This is the health state
+
+        #Pre-computed constants for TVMS
+        self.sq_c1= self.delta_ts*0.5
+        self.sq_c2= 2 / np.pi
+        self.sq_c3= np.pi*2*self.f
+
+        # sampling period
+        self.sampling_period = np.average(np.diff(self.constants["t_range"]))
+        self.samples_before_fault = int(self.cycles_before_fault*(1/self.f)/self.sampling_period)
+
+        # Calculate parameters for the faulty square wave
+        fault_start_time = self.cycles_before_fault / self.f
+        fault_end_time = (self.cycles_before_fault + 1) / self.f
+        self.transition_time = (1 / self.f) * (1 / 25)  # Transition for a tenth of the period
+        self.half_transition_time = self.transition_time / 2
+
+        self.first_transition_start_time = fault_start_time - self.half_transition_time
+        self.first_transition_end_time = fault_start_time + self.half_transition_time
+        self.second_transition_start_time = fault_end_time - self.half_transition_time
+        self.second_transition_end_time = fault_end_time + self.half_transition_time
+
+        self.k_at_first_transition_start = self.smooth_square(self.first_transition_start_time)
+        self.k_at_second_transition_end = self.smooth_square(self.second_transition_end_time)
+        return
+
+    def smooth_square(self, t):
+        #return self.k_sts + self.delta_ts * 0.5 * ((2 / np.pi) * np.arctan(np.sin(2 * np.pi * t * self.f) /
+        #                                                                   self.smoothness_delta) + 1)
+        return self.k_sts + self.sq_c1 * ((self.sq_c2) * np.arctan(np.sin(self.sq_c3*t) /self.smoothness_delta) + 1)
+
+
+    def tvms(self, t,first_transition_gradient,second_transition_gradient,k_at_second_transition_start):
+
+        if self.x[0]==0: # In healthy condition no alteration is required
+            #print("Healthy  loop")
+            return self.smooth_square(t)
+
+        if self.first_transition_start_time < t <= self.first_transition_end_time:
+            return self.k_at_first_transition_start - (
+                    t - self.first_transition_start_time) * first_transition_gradient
+        # during fault
+        if self.first_transition_end_time < t <= self.second_transition_start_time:
+            return self.smooth_square(t) - self.x*1e8
+
+        if self.second_transition_start_time < t <= self.second_transition_end_time:
+            return k_at_second_transition_start - (
+                    t - self.second_transition_start_time) * second_transition_gradient
+
+        # # ramp up after fault
+        # if fault_end_time - half_transition_time < t < fault_end_time + half_transition_time:
+        #     return self.smooth_square(fault_end_time-half_transition_time) + stiffness_decrease + (t-(
+        #             fault_end_time-half_transition_time))*stiffness_decrease/transition_time
+
+        else:
+            return self.smooth_square(t)
+
+    def get_y(self, c):
+        k_at_first_transition_end = self.smooth_square(self.first_transition_end_time) - self.x*1e8
+        k_at_second_transition_start = self.smooth_square(self.second_transition_start_time) - self.x*1e8
+        first_transition_gradient = (self.k_at_first_transition_start - k_at_first_transition_end) /self.transition_time
+        second_transition_gradient = (k_at_second_transition_start - self.k_at_second_transition_end) / self.transition_time
+        # print(first_transition_gradient)
+
+        m1 = self.theta[0] # 1.116
+        I1 =  6.405e-3  # self.theta[1]
+        r1 = self.constants["r1"]  # (2 * 55 / 2) / 1000
+        k1 = 1e8  # self.theta[1]
+        c1 = 1.2e5 #5e3# 3e5  # 1.2e5 # self.theta[2]
+
+        m2 = self.constants["m2"]   # 0.015
+        I2 = self.constants["I2"] # 0.011
+        r2 = self.constants["r2"] # (2 * 75 / 2) / 1000
+        k2 = 1e7 #self.theta[3]
+        c2 = 1.2e5# 5e3#3e5# 1.2e5 #self.theta[2]
+
+        mg = I1 * I2 / (I1 * r2 ** 2 + I2 * r1 ** 2)
+        cg = 1e3 # 8e3#1e3 #self.theta[4]
+
+        M2 = c[0]  # Operating condition is applied torque to planet gear
+        M1 = M2*r2/r1  # Ensure force equilibrium
+
+        F3 = (I2 * r1 * M1 + I1 * r2 * M2) / (I1 * r2 ** 2 + I2 * r2 ** 2)
+
+        M = np.array([[m1, 0, 0],
+                      [0, m2, 0],
+                      [-mg, mg, mg]])
+
+        kg = lambda t: self.tvms(t,first_transition_gradient,second_transition_gradient,k_at_second_transition_start)
+
+        C_arr = np.array([[c1, 0, -cg], [0, c2, cg], [0, 0, cg]])
+        C = lambda t: C_arr#Rather use proportional damping
+
+        K = lambda t: np.array([[k1, 0, -kg(t)], [0, k2, kg(t)], [0, 0, kg(t)]])
+
+        Mp_K0 = K(0) + M
+
+        #C = lambda t: Mp_K0*self.theta[4] # For making use of proportional damping
+
+        f = lambda t: -np.array([[0], [0], [F3]])
+
+        X0t = np.linalg.solve(K(0), f(0))  # initial conditions that would lead to zero initial accelerations
+        X0 = X0t[:, 0]
+        Xd0 = np.array([0, 0, 0])
+
+        lmm2dof = sp.LMM_sys(M, C, K, f)  # Define a lumped mass model
+
+        # init_cond = np.hstack((X0, Xd0))  # Set initial condition
+        init_cond = np.zeros(6)
+        t_range = self.constants["t_range"]
+
+        de = sp.FirsOrderDESys(lmm2dof.E_Q, init_cond, t_range)
+        y = de.get_Xdotdot("RK45")[:, 0]  # Measure accelerations at mass 1
+
+        y_measured_section = y[self.samples_before_fault:]
+        #y_measured_section = y
+
+        return y_measured_section
+

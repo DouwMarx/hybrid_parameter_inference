@@ -53,7 +53,7 @@ class System(object):
                 plt.ylabel("Measured acceleration")
         return
 
-    def plot_model_vs_measured(self, measurements, plot_title_addition = ""):
+    def plot_model_vs_measured(self, measurements, plot_title_addition = "",plot_only_one=None):
         c = measurements["c"]
         z = measurements["z"]
         t = self.g.constants["t_range"]
@@ -63,12 +63,18 @@ class System(object):
         #plt.title("Model fit " + plot_title_addition)
         z_mod = self.simulate(c, False, noise=None)
         # TODO2: plot only one measurment
-        for condition, zi in enumerate(z):
-            plt.plot(t, zi, ".", label= str(c[condition][0]) + "Nm measurements" )
-            plt.plot(t, z_mod[condition], label=str(c[condition][0]) + "Nm model fit")
+        if plot_only_one:
+            for condition, zi in zip([plot_only_one],[z[plot_only_one]]):
+                plt.plot(t, zi, ".", label= str(c[condition][0]) + "Nm measurements" )
+                plt.plot(t, z_mod[condition],"k", label=str(c[condition][0]) + "Nm model fit")
+
+        else:
+            for condition, zi in enumerate(z):
+                plt.plot(t, zi, ".", label= str(c[condition][0]) + "Nm measurements" )
+                plt.plot(t, z_mod[condition], label=str(c[condition][0]) + "Nm model fit")
         plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
         plt.xlabel("Time [s]")
-        plt.ylabel("Measured acceleration ($m/s^2$)")
+        plt.ylabel("Acceleration ($m/s^2$)")
         return
 
     def get_parameter_summary(self, print_addition=""):
@@ -101,18 +107,17 @@ class ParameterInference(ABC):
     def cost(self, parameters):
         self.build_candidate_sys(parameters)
         z = self.sys.simulate(self.measurements["c"])  # Simulate model for all operating conditions
-        cost_for_each_measurement = [np.log(np.linalg.norm(z[i] - self.measurements["z"][i])) for i in range(len(z))]
+        #cost_for_each_measurement = [np.log(np.linalg.norm(z[i] - self.measurements["z"][i])) for i in range(len(z))]
+        cost_for_each_measurement = [np.linalg.norm(z[i] - self.measurements["z"][i]) for i in range(len(z))]
         return np.sum(cost_for_each_measurement)
 
-    def run_optimisation(self, cost_function, bounds, startpoint = np.array([1.1, 6.5e-3, 0.9e8, 0.9e7, 0.4])):
-        # sol = opt.minimize(self.cost, startpoint)#, bounds=bounds)
+    # def run_optimisation(self, cost_function, bounds, startpoint = np.array([1.1,0.21])):
+    def run_optimisation(self, bounds, startpoint=np.array([1.1, 0.21])):
 
-        sol = opt.minimize(self.cost,startpoint, bounds=bounds)#, bounds=bounds)
+        #sol = opt.minimize(self.cost,startpoint, bounds=bounds)#, bounds=bounds)
         # sol = opt.shgo(self.cost, bounds=bounds)
         # sol = opt.dual_annealing(self.cost, bounds)
-        # sol = opt.differential_evolution(cost_function,
-        #                                  bounds,
-        #                                  disp=True)
+        sol = opt.differential_evolution(self.cost,bounds,disp=True,tol=0.1)
         self.optimisation_complete = True
         if sol["success"] == False:
             print("Optimisation considered unsuccessful due to: ", sol["message"])
@@ -197,3 +202,5 @@ class DamageInference(ParameterInference):
         """
         # Update the system with the latest candidate solution
         self.sys.g.x = x
+        # print("candidate updated with, ",x)
+

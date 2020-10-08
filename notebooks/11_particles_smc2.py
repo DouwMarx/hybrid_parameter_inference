@@ -34,8 +34,8 @@ class ParisLaw(ssm.StateSpaceModel):
 rerun_simulation = False # If the simulation in not rerun, an older simulation is simply loaded
 if rerun_simulation:
     # Generate data for the true model parameters
-    true_c = 8.5e-11
-    true_m = 2.7
+    true_c = 9.12e-11
+    true_m = 1.4354
     true_a0 = 0.1
     true_model = ParisLaw(c=true_c, m=true_m, a0=true_a0)  # actual model, theta = [mu, rho, sigma]
 
@@ -244,7 +244,7 @@ proc_obj = ProcessSmc2Obj(alg_smc2)
 #proc_obj.plot_data()
 #proc_obj.plot_state_dists()
 #proc_obj.plot_theta_dists()
-proc_obj.plot_state_estimates_with_time()
+#proc_obj.plot_state_estimates_with_time()
 # proc_obj.plot_RUL_dists()
 
 # cyc = proc_obj.estimate_rul(3)
