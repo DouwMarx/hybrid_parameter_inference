@@ -6,7 +6,14 @@ import matplotlib.pyplot as plt
 
 def Stess_Intensity(ap):
     # delta_K = 2.52 * ap ** 4 - 7.175 * ap ** 3 + 7.499 * ap ** 2 + 16.751 * ap + 25.828
-    delta_K = 5.446 * ap ** 6 - 56.16 * ap ** 5 + 216.6 * ap ** 4 - 372.6 * ap ** 3 + 268.3 * ap ** 2 - 23.46 * ap +35.2
+
+    # delta_K = 5.446 * ap ** 6 - 56.16 * ap ** 5 + 216.6 * ap ** 4 - 372.6 * ap ** 3 + 268.3 * ap ** 2 - 23.46 * ap +35.2
+    a=2.22525268
+    b=0.97965542
+    c=0.01300591
+    d=0.60693478
+    e=9.08100516
+    delta_K = a * np.exp(b * ap) + c*np.exp(d*ap**2) + e
     return delta_K
 
 

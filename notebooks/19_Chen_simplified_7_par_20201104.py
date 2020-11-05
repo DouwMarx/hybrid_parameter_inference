@@ -8,7 +8,10 @@ import numpy as np
 
 t_start = time.time()
 # Define the true model parameters
-theta_real = np.array([1.116]) # theta = [m_ring, I_ring, k1 ,k2]
+theta_real = np.array([1.116, 6.405,1,1,1.2,1.2,1]) # theta = [m_ring, I_ring, k1 ,k2,c1c2,c_gm]
+# I is adjusted for 1e-3,
+# K1 adjusted by 1e8
+# K2 adjusted by 1e7
 phi_real = np.array([np.sin(np.deg2rad(20))])  # Measurement model transfer function is multiplication by constant.
 # Fraction of pressure angle
 
@@ -19,7 +22,7 @@ x_real_d0 = np.array([0])  # 0 N/m mean stiffness reduction (healthy)
 h_real = h_maps.Constant(phi_real)
 
 # Define the real physics based model g for healthy and damaged states
-g_real_d0 = g_maps.Chen2011(theta_real, x_real_d0)
+g_real_d0 = g_maps.Chen2011_7par(theta_real, x_real_d0)
 
 # Define the system
 sys_real_d0 = sys_model.System(g_real_d0, h_real)
@@ -36,28 +39,28 @@ z_real_d0 = sys_real_d0.simulate(c, noise=noise, plot=True)  # INFO: Toggle if p
 #plt.ylabel("Acceleration of ring gear")
 #plt.show()
 
-with open("real_d0_20201101.pkl", "wb") as fname:
+with open("real_d0_20201104.pkl", "wb") as fname:
     pickle.dump(sys_real_d0, fname)
 
 # Define a model that might be appropriate for the physics we expect
 # theta_real = np.array([1.116, 6.405e-3, 1e8, 1e7])  # theta = [m_ring, I_ring, k1 ,k2, c_prop]
 # phi_real = np.array([1])  # Measurement model transfer function is multiplication by constant
-theta_mod = np.array([1])
+theta_mod = np.array([1,5,1.1,1.2,1.2,1,1])
 phi_mod = np.array([1])
 x_mod = x_real_d0  # Assume we know the initial damage condition exactly
 
-g_mod = g_maps.Chen2011(theta_mod, x_mod)
+g_mod = g_maps.Chen2011_7par(theta_mod, x_mod)
 h_mod = h_maps.Constant(phi_mod)
 sys_mod = sys_model.System(g_mod, h_mod)
 
-with open("sys_mod_20201101.pkl", "wb") as fname:
+with open("sys_mod_20201104.pkl", "wb") as fname:
     pickle.dump(sys_mod, fname)
 
 # Solve for the most likely model parameters given the healthy measurements (fit sys_mod to data)
 measurements_d0= {"c": c,
                 "z": z_real_d0}
 
-with open("healthy_measurements_20201101.pkl", "wb") as fname:
+with open("healthy_measurements_20201104.pkl", "wb") as fname:
     pickle.dump(measurements_d0, fname)
 
 cal_obj = sys_model.Calibration(sys_mod, measurements_d0)
@@ -72,7 +75,13 @@ cal_obj = sys_model.Calibration(sys_mod, measurements_d0)
 # cal_obj.run_optimisation_separately(theta_bounds, phi_bounds,n_iter,plot_fit=True, verbose=True)
 
 # # Solve all parameters at once
-bounds =((1, 1.2),  # theta_real = np.array([1.116])
+bounds =((1, 1.2),  # theta_real = np.array([1.116, 6.405])
+         (6.1, 6.5),
+         (0.9, 1.1),
+         (0.9, 1.1),
+         (1.1, 1.3),
+         (1.1, 1.3),
+         (0.9, 1.1),
          (0.2, 0.4),) #phi_real = np.array([0.342])
 
 sol = cal_obj.run_optimisation(bounds)
@@ -80,10 +89,10 @@ sol = cal_obj.run_optimisation(bounds)
 print("")
 sys_mod.get_parameter_summary(print_addition="learnt parameters for model from healthy data")
 
-with open("sys_calibrated_20201101.pkl", "wb") as fname:
+with open("sys_calibrated_20201104.pkl", "wb") as fname:
     pickle.dump(cal_obj, fname)
 
-with open("sys_calibrated_20201101.pkl", "rb") as fname:
+with open("sys_calibrated_20201104.pkl", "rb") as fname:
     cal_obj = pickle.load(fname)
 
 # Damage inference
@@ -92,7 +101,7 @@ for damage in np.linspace(0,1,4)[1:]*0.5:  # 3 damage states
     x_real_d1 = np.array([damage])  # 0.3e8 N/m mean stiffness reduction (damaged)
 
     # define real physics-based model at damage state
-    g_real_d1 = g_maps.Chen2011(theta_real, x_real_d1)
+    g_real_d1 = g_maps.Chen2011_7par(theta_real, x_real_d1)
 
     # define system
     sys_real_d1 = sys_model.System(g_real_d1, h_real)  # Notice that transfer function is independent of damage
@@ -116,7 +125,7 @@ for damage in np.linspace(0,1,4)[1:]*0.5:  # 3 damage states
     print("Predicted health state: ", x_pred["x"])
     print("")
 
-    with open("mod_damage_inferred_20201101" + str(np.round(damage,2)) + ".pkl", "wb") as fname:
+    with open("mod_damage_inferred_20201104" + str(np.round(damage,2)) + ".pkl", "wb") as fname:
         pickle.dump(cal_obj_for_damaged, fname)
 print((time.time() - t_start)/60," min runtime")
 

@@ -4,11 +4,12 @@ import src.models.g_mappings as g_maps
 import src.models.system_modeller as sys_model
 import numpy as np
 import pickle
+from datetime import  datetime
 
 def save_plot_to_directory(plot_name):
     path = "C:\\Users\\douwm\\repos\\Hybrid_Approach_To_Planetary_Gearbox_Prognostics\\reports\\masters_report" \
            "\\5_model_callibration\\Images"
-    plt.savefig(path + "\\" + plot_name + ".pdf",bbox_inches = "tight")
+    plt.savefig(path + "\\" + plot_name + datetime.today().strftime('%Y%m%d') + ".pdf", bbox_inches = "tight")
     return
 
 theta = np.array([1.116, 6.405e-3, 1e8, 1e7]) # Using theta as global
@@ -92,7 +93,7 @@ def plot_healthy_and_damaged_at_operating_condition():
     return
 
 def plot_measured_data():
-    fname = "sys_calibrated.pkl"
+    fname = "sys_calibrated_20201104.pkl"
     with open(fname,"rb") as f:
         sys_cal_d0 = pickle.load(f)
 
@@ -124,7 +125,7 @@ def plot_measured_data():
     return
 
 def plot_healthy_fit():
-    fname = "sys_calibrated.pkl"
+    fname = "sys_calibrated_20201104.pkl"
     with open(fname,"rb") as f:
         sys_calibrated = pickle.load(f)
 
@@ -139,7 +140,7 @@ def plot_healthy_fit():
     return
 
 def plot_damaged_fit():
-    fname = "mod_damage_inferred0.33.pkl"
+    fname = "mod_damage_inferred_202011040.33.pkl"
     with open(fname,"rb") as f:
         mod_damaged = pickle.load(f)
 
@@ -166,8 +167,8 @@ def plot_damaged_fit():
 
 #plot_healthy_and_damged_TVMS()
 #plot_healthy_and_damaged_at_operating_condition()
-# plot_measured_data()
-#plot_healthy_fit()
+plot_measured_data()
+plot_healthy_fit()
 plot_damaged_fit()
 
 # applied_torque = np.array([10])

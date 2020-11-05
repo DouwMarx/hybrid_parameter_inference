@@ -7,10 +7,11 @@ import seaborn as sb
 import src.features.paris_law_analytical as pla
 from particles import smc_samplers as ssp
 import dill
+from datetime import datetime
 
 #delta_N = 1e7
-delta_N =8e6
-af = 4
+delta_N =5.4e7
+af = 5
 
 
 def get_measurements(true_c,true_m,true_a0,plot = False):
@@ -54,7 +55,8 @@ class ParisLaw(ssm.StateSpaceModel):
 
     def a(self, cp, mp, ap):
         #return (delta_N * (2 / (2 - mp)) * cp * self.delta_K(ap) ** mp + ap ** ((2 - mp) / 2)) ** (2 / (2 - mp))
-        return ap + delta_N*cp*(self.delta_K(ap))**mp
+        delta_a =  delta_N*cp*(self.delta_K(ap))**mp
+        return ap + delta_N*cp*(self.delta_K(ap+delta_a/2))**mp
 
     def delta_K(self, ap):
         #return 2.52*ap**4 - 7.175*ap**3 + 7.499*ap**2 + 16.751*ap + 25.828
@@ -101,20 +103,22 @@ if rerun_simulation:
     my_prior = dists.StructDist(prior_dict)
 
     # Run the smc2 inference
-    fk_smc2 = ssp.SMC2(ssm_cls=ParisLaw, data=data, prior=my_prior, init_Nx=8000)#, ar_to_increase_Nx=0.1)
-    alg_smc2 = particles.SMC(fk=fk_smc2, N=10000, store_history=True, verbose=True)
+    # fk_smc2 = ssp.SMC2(ssm_cls=ParisLaw, data=data, prior=my_prior, init_Nx=1000)#, ar_to_increase_Nx=0.1)
+    fk_smc2 = ssp.SMC2(ssm_cls=ParisLaw, data=data, prior=my_prior, init_Nx=5000)#, ar_to_increase_Nx=0.1) #Pf
+    # particles
+    alg_smc2 = particles.SMC(fk=fk_smc2, N=5000, store_history=True, verbose=True)  # Theta_particles
     alg_smc2.run()
 
     alg_smc2.true_model = true_model  # Save the true model so it can be used in post processing
     alg_smc2.true_states = true_states  # Save the true states so RUL's can be calculated
 
     # Save the result
-    with open('run_20201010a.pkl', 'wb') as f:
+    with open('run_20201105transf.pkl', 'wb') as f:
         dill.dump(alg_smc2, f)
 
 
 # Load the previously computed data
-with open('run_20201010a.pkl', 'rb') as f:
+with open('run_20201105transf.pkl', 'rb') as f:
     alg_smc2 = dill.load(f)
 
 
@@ -219,9 +223,9 @@ class ProcessSmc2Obj(object):
         n_cycles = self.time_steps*delta_N
         plt.figure()
         plt.scatter(n_cycles,self.data, marker="x", label="Measurements")
-        plt.scatter(n_cycles,self.true_states, marker=".", label="True states")
+        plt.scatter(n_cycles,self.true_states, marker=".", label="True crack length")
 
-        plt.plot(n_cycles, state_aves, label="Average of state estimate")
+        plt.plot(n_cycles, state_aves, label="Average crack length estimate")
         factor = 1
         top = state_aves + state_sds*factor
         bot = state_aves - state_sds*factor
@@ -229,7 +233,7 @@ class ProcessSmc2Obj(object):
         plt.fill_between(n_cycles, bot, top, alpha= 0.3, label="1 standard deviation")
         plt.legend()
         plt.xlabel("Number of cycles")
-        plt.ylabel("state estimate")
+        plt.ylabel("crack length (mm)")
         self.save_plot_to_directory("mean_and_sd_states_with_time")
 
         return
@@ -237,7 +241,7 @@ class ProcessSmc2Obj(object):
     def save_plot_to_directory(self, plot_name):
         path = "C:\\Users\\douwm\\repos\\Hybrid_Approach_To_Planetary_Gearbox_Prognostics\\reports\\masters_report" \
                "\\5_model_callibration\\Images"
-        plt.savefig(path + "\\" + plot_name + ".pdf")
+        plt.savefig(path + "\\" + plot_name + datetime.today().strftime('%Y%m%d')+ "trans.pdf")
 
     def get_rul_pred_samples(self,t):
         m = self.Xhist[t].theta["m"]
@@ -251,7 +255,7 @@ class ProcessSmc2Obj(object):
         return m, c, a_t
 
     def estimate_rul(self,t):
-        pl = ParisLaw() # Initialize paris law object so SIF's can be computed
+        # pl = ParisLaw() # Initialize paris law object so SIF's can be computed
         m,c,a_t = self.get_rul_pred_samples(t)
         # print("m",np.average(m))
         # print("c",np.average(c))

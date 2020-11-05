@@ -8,7 +8,7 @@ import numpy as np
 
 t_start = time.time()
 # Define the true model parameters
-theta_real = np.array([1.116]) # theta = [m_ring, I_ring, k1 ,k2]
+theta_real = np.array([1.116, 6.405]) # theta = [m_ring, I_ring, k1 ,k2] # I is adjusted for 1e-3
 phi_real = np.array([np.sin(np.deg2rad(20))])  # Measurement model transfer function is multiplication by constant.
 # Fraction of pressure angle
 
@@ -42,7 +42,7 @@ with open("real_d0_20201101.pkl", "wb") as fname:
 # Define a model that might be appropriate for the physics we expect
 # theta_real = np.array([1.116, 6.405e-3, 1e8, 1e7])  # theta = [m_ring, I_ring, k1 ,k2, c_prop]
 # phi_real = np.array([1])  # Measurement model transfer function is multiplication by constant
-theta_mod = np.array([1])
+theta_mod = np.array([1,5])
 phi_mod = np.array([1])
 x_mod = x_real_d0  # Assume we know the initial damage condition exactly
 
@@ -72,8 +72,9 @@ cal_obj = sys_model.Calibration(sys_mod, measurements_d0)
 # cal_obj.run_optimisation_separately(theta_bounds, phi_bounds,n_iter,plot_fit=True, verbose=True)
 
 # # Solve all parameters at once
-bounds =((1, 1.2),  # theta_real = np.array([1.116])
-         (0.2, 0.4),) #phi_real = np.array([0.342])
+bounds =((1, 1.2),  # theta_real = np.array([1.116, 6.405])
+         (6.1, 6.5),
+        (0.2, 0.4),) #phi_real = np.array([0.342])
 
 sol = cal_obj.run_optimisation(bounds)
 #

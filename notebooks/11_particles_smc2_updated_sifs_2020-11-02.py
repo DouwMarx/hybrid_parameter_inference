@@ -7,10 +7,11 @@ import seaborn as sb
 import src.features.paris_law_analytical as pla
 from particles import smc_samplers as ssp
 import dill
+from datetime import datetime
 
 #delta_N = 1e7
-delta_N =8e6
-af = 4
+delta_N =5.4e7
+af = 5
 
 
 def get_measurements(true_c,true_m,true_a0,plot = False):
@@ -101,7 +102,8 @@ if rerun_simulation:
     my_prior = dists.StructDist(prior_dict)
 
     # Run the smc2 inference
-    fk_smc2 = ssp.SMC2(ssm_cls=ParisLaw, data=data, prior=my_prior, init_Nx=8000)#, ar_to_increase_Nx=0.1)
+    # fk_smc2 = ssp.SMC2(ssm_cls=ParisLaw, data=data, prior=my_prior, init_Nx=1000)#, ar_to_increase_Nx=0.1)
+    fk_smc2 = ssp.SMC2(ssm_cls=ParisLaw, data=data, prior=my_prior, init_Nx=10000)#, ar_to_increase_Nx=0.1)
     alg_smc2 = particles.SMC(fk=fk_smc2, N=10000, store_history=True, verbose=True)
     alg_smc2.run()
 
@@ -109,12 +111,12 @@ if rerun_simulation:
     alg_smc2.true_states = true_states  # Save the true states so RUL's can be calculated
 
     # Save the result
-    with open('run_20201010a.pkl', 'wb') as f:
+    with open('run_20201105b.pkl', 'wb') as f:
         dill.dump(alg_smc2, f)
 
 
 # Load the previously computed data
-with open('run_20201010a.pkl', 'rb') as f:
+with open('run_20201105b.pkl', 'rb') as f:
     alg_smc2 = dill.load(f)
 
 
@@ -237,7 +239,7 @@ class ProcessSmc2Obj(object):
     def save_plot_to_directory(self, plot_name):
         path = "C:\\Users\\douwm\\repos\\Hybrid_Approach_To_Planetary_Gearbox_Prognostics\\reports\\masters_report" \
                "\\5_model_callibration\\Images"
-        plt.savefig(path + "\\" + plot_name + ".pdf")
+        plt.savefig(path + "\\" + plot_name + datetime.today().strftime('%Y%m%d')+ ".pdf")
 
     def get_rul_pred_samples(self,t):
         m = self.Xhist[t].theta["m"]
@@ -251,7 +253,7 @@ class ProcessSmc2Obj(object):
         return m, c, a_t
 
     def estimate_rul(self,t):
-        pl = ParisLaw() # Initialize paris law object so SIF's can be computed
+        # pl = ParisLaw() # Initialize paris law object so SIF's can be computed
         m,c,a_t = self.get_rul_pred_samples(t)
         # print("m",np.average(m))
         # print("c",np.average(c))
