@@ -39,7 +39,7 @@ z_real_d0 = sys_real_d0.simulate(c, noise=noise, plot=True)  # INFO: Toggle if p
 #plt.ylabel("Acceleration of ring gear")
 #plt.show()
 
-with open("real_d0_20201104.pkl", "wb") as fname:
+with open("real_d0_20201119.pkl", "wb") as fname:
     pickle.dump(sys_real_d0, fname)
 
 # Define a model that might be appropriate for the physics we expect
@@ -53,14 +53,14 @@ g_mod = g_maps.Chen2011_7par(theta_mod, x_mod)
 h_mod = h_maps.Constant(phi_mod)
 sys_mod = sys_model.System(g_mod, h_mod)
 
-with open("sys_mod_20201104.pkl", "wb") as fname:
+with open("sys_mod_20201119.pkl", "wb") as fname:
     pickle.dump(sys_mod, fname)
 
 # Solve for the most likely model parameters given the healthy measurements (fit sys_mod to data)
 measurements_d0= {"c": c,
                 "z": z_real_d0}
 
-with open("healthy_measurements_20201104.pkl", "wb") as fname:
+with open("healthy_measurements_20201119.pkl", "wb") as fname:
     pickle.dump(measurements_d0, fname)
 
 cal_obj = sys_model.Calibration(sys_mod, measurements_d0)
@@ -74,25 +74,27 @@ cal_obj = sys_model.Calibration(sys_mod, measurements_d0)
 # n_iter = 3
 # cal_obj.run_optimisation_separately(theta_bounds, phi_bounds,n_iter,plot_fit=True, verbose=True)
 
-# # Solve all parameters at once
-bounds =((1, 1.2),  # theta_real = np.array([1.116, 6.405])
-         (6.1, 6.5),
-         (0.9, 1.1),
-         (0.9, 1.1),
-         (1.1, 1.3),
-         (1.1, 1.3),
-         (0.9, 1.1),
-         (0.2, 0.4),) #phi_real = np.array([0.342])
+# # Solve all parameters theta_real = np.array([1.116, 6.405,1,1,1.2,1.2,1]) meters at once
+bot_frac = 0.8
+top_frac = 1.2
+bounds =((bot_frac*1.116, 1.2*1.116),
+         (bot_frac*6.405,top_frac* 6.405),
+         (bot_frac*1,top_frac* 1),
+         (bot_frac*1,top_frac* 1),
+         (bot_frac*1.2,top_frac* 1.2),
+         (bot_frac*1.2,top_frac* 1.2),
+         (bot_frac*1,top_frac* 1),
+         (bot_frac*0.3420,top_frac* 0.3420),) #phi_real = np.array([0.342])
 
 sol = cal_obj.run_optimisation(bounds)
 #
 print("")
 sys_mod.get_parameter_summary(print_addition="learnt parameters for model from healthy data")
 
-with open("sys_calibrated_20201104.pkl", "wb") as fname:
+with open("sys_calibrated_20201119.pkl", "wb") as fname:
     pickle.dump(cal_obj, fname)
 
-with open("sys_calibrated_20201104.pkl", "rb") as fname:
+with open("sys_calibrated_20201119.pkl", "rb") as fname:
     cal_obj = pickle.load(fname)
 
 # Damage inference
@@ -125,7 +127,7 @@ for damage in np.linspace(0,1,4)[1:]*0.5:  # 3 damage states
     print("Predicted health state: ", x_pred["x"])
     print("")
 
-    with open("mod_damage_inferred_20201104" + str(np.round(damage,2)) + ".pkl", "wb") as fname:
+    with open("mod_damage_inferred_20201119" + str(np.round(damage,2)) + ".pkl", "wb") as fname:
         pickle.dump(cal_obj_for_damaged, fname)
 print((time.time() - t_start)/60," min runtime")
 

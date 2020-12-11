@@ -41,7 +41,7 @@ def plot_healthy_and_damged_TVMS():
         plt.plot(t,tvms, label = str(np.round(stiffness_reduction[0],3)) + "e8 N/m reduction")
 
     plt.legend(loc= "lower right")
-    #save_plot_to_directory("TVMS")
+    save_plot_to_directory("TVMS_20201119")
     return
 
 
@@ -93,7 +93,7 @@ def plot_healthy_and_damaged_at_operating_condition():
     return
 
 def plot_measured_data():
-    fname = "sys_calibrated_20201104.pkl"
+    fname = "sys_calibrated_20201119.pkl"
     with open(fname,"rb") as f:
         sys_cal_d0 = pickle.load(f)
 
@@ -125,7 +125,7 @@ def plot_measured_data():
     return
 
 def plot_healthy_fit():
-    fname = "sys_calibrated_20201104.pkl"
+    fname = "sys_calibrated_20201119.pkl"
     with open(fname,"rb") as f:
         sys_calibrated = pickle.load(f)
 
@@ -140,7 +140,7 @@ def plot_healthy_fit():
     return
 
 def plot_damaged_fit():
-    fname = "mod_damage_inferred_202011040.33.pkl"
+    fname = "mod_damage_inferred_202011190.33.pkl"
     with open(fname,"rb") as f:
         mod_damaged = pickle.load(f)
 
@@ -165,8 +165,8 @@ def plot_damaged_fit():
 
 
 
-#plot_healthy_and_damged_TVMS()
-#plot_healthy_and_damaged_at_operating_condition()
+# plot_healthy_and_damged_TVMS()
+# plot_healthy_and_damaged_at_operating_condition()
 plot_measured_data()
 plot_healthy_fit()
 plot_damaged_fit()

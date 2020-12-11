@@ -43,27 +43,20 @@ class ParisLaw(ssm.StateSpaceModel):
         return dists.Dirac(loc=self.a0)
 
     def PX(self, t, xp):  # Distribution of X_t given X_{t-1}=xp (p=past)
-        # Division by 4 done to scale distributions
-        #return dists.Normal(loc=self.a(self.c, self.m, xp), scale=1e-2)
         return dists.Dirac(loc=self.a(self.c, self.m, xp))
         # normally distributed?
 
     def PY(self, t, xp, x):  # Distribution of Y_t given X_t=x (and possibly X_{t-1}=xp)
-        return dists.Normal(loc=x, scale=self.v) # If this sdev too small, warning: could not compute Colesky,
-        #return dists.Dirac(loc=x) # If this sdev too small, warning: could not compute Colesky,
-        # use diag in stead
+        return dists.Normal(loc=x, scale=self.v)
 
     def a(self, cp, mp, ap):
-        #return (delta_N * (2 / (2 - mp)) * cp * self.delta_K(ap) ** mp + ap ** ((2 - mp) / 2)) ** (2 / (2 - mp))
         delta_a =  delta_N*cp*(self.delta_K(ap))**mp
         return ap + delta_N*cp*(self.delta_K(ap+delta_a/2))**mp
 
     def delta_K(self, ap):
-        #return 2.52*ap**4 - 7.175*ap**3 + 7.499*ap**2 + 16.751*ap + 25.828
-        #return 5.446*ap**6 - 56.16*ap**5 + 216.6*ap**4 - 372.6*ap**3 + 268.3*ap**2 - 23.46*ap**1 + 35.2
         return pla.Stess_Intensity(ap)
 
-rerun_simulation =  True# If the simulation in not rerun, an older simulation is simply loaded
+rerun_simulation =  False# If the simulation in not rerun, an older simulation is simply loaded
 if rerun_simulation:
     # Generate data for the true model parameters
     true_c = 9.12e-11
@@ -113,12 +106,12 @@ if rerun_simulation:
     alg_smc2.true_states = true_states  # Save the true states so RUL's can be calculated
 
     # Save the result
-    with open('run_20201105transf.pkl', 'wb') as f:
+    with open('run_20201105transe.pkl', 'wb') as f:
         dill.dump(alg_smc2, f)
 
 
 # Load the previously computed data
-with open('run_20201105transf.pkl', 'rb') as f:
+with open('run_20201105transe.pkl', 'rb') as f:
     alg_smc2 = dill.load(f)
 
 
